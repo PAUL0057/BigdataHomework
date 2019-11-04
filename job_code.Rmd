@@ -1,0 +1,97 @@
+---
+title: "主成分分析"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(corrplot)			#相关系数矩阵可视化的corrplot包
+
+dat0 = read.csv("job.csv",header=T) #读取数据
+head(dat0)  # 显示数据的前几个观测
+```
+---
+
+描述分析
+---
+```{r}
+summary(dat0[,-c(1)])  #计算所有变量的基本统计量
+# 绘制统计图
+# par(family="KaiTi")   如果你用的是mac（可实现在统计图中显示中文）
+hist(dat0$外观,col="gold",xlab="外观得分",ylab="频数",main="外观得分的直方图")  #绘制“外观”变量的直方图
+boxplot(dat0[,-c(1)],col="gold",ylab="得分",main="14个评价指标的得分分布情况")  #绘制所有变量的箱线图
+```
+---
+
+相关分析
+---
+```{r}
+#尝试绘制14个观测变量的散点图矩阵
+plot(dat0[,-c(1)])	#变量太多，可视化效果很糟糕
+### 计算数据集的相关系数矩阵并可视化
+mycor=cor(dat0[,-c(1)])					#计算相关系数
+corrplot(mycor,tl.col="black")	#相关系数可视化，需要调用corrplot包.具体的参数设置办法可以参见help文档
+
+```
+---
+
+主成分分析
+---
+```{r}
+##  使用princomp函数（使用特征分解办法求解主成分）
+pca.fit=princomp(dat0[,-c(1)])
+```
+---
+
+结果分析
+---
+
+首先，确定需要保留几个主成分
+```{r}
+summary(pca.fit)   #输出所有主成分的标准差（特征值开平方）、方差贡献率、累计贡献率。初步判断，保留4个主成分可达到83%的解释程度
+plot(pca.fit,type="lines",main="碎石图")    #绘制碎石图。可以考虑保留2个主成分（便于可视化）
+```
+
+其次，对主成分的含义进行解释
+
+```{r}
+pca.fit$loadings  #输出全部主成分系数（特征向量），可以用于解释主成分的含义。小于0.1的数值被忽略
+cbind(round(pca.fit$loadings[,1:4],2))  #输出前4个主成分的主成分系数（完整系数）
+# 注意：此案例中，第一主成分的系数全部为负。需要增加以下两个步骤（在一般的case里面，这两个步骤不是必须的）
+#为了便于解释第一主成分的含义，需要将第一主成分的主成分系数都乘以－1，则使第一主成分的系数全部为正。
+pca.fit$loadings[,1]=pca.fit$loadings[,1]*(-1)
+pca.fit$loadings
+cbind(round(pca.fit$loadings[,1:4],2))#转换后，重新输出前4个主成分的主成分系数（完整系数）
+#可以得到第一个主成分的表达式：PC1=0.15*简历格式＋0.13*外观+…＋0.27*适应力，可命名为“能力”。第二个主成分的表达式：PC2=0.37*简历格式-0.03*外观+...+0.47*适应力，可命名为“经验”,…,依此类推。
+#由于对主成分系数进行了－1变化，这里也要对第一主成分得分乘以－1
+pca.fit$scores[,1]=pca.fit$scores[,1]*(-1)
+```
+
+最后，利用主成分得分进行综合评价
+
+```{r}
+dat0[,17:20]=pca.fit$scores[,1:4]    #存储所有应聘者的前4个主成分得分
+names(dat0)[17:20]=c("score1","score2","score3","score4") #变量重命名
+```
+
+综合评价方法1：根据第一主成分得分进行综合排序（第一主成分的系数全部为正时，才可使用此方法）
+
+```{r}
+pca.temp1=dat0[order(dat0$score1,decreasing=TRUE),]  # 按第一主成分得分进行排序（降序）
+pca.temp1[1:10,] #综合表现最好的前10名应聘者（第一主成分得分最高的前10名应聘者）
+```
+
+综合评价方法2：根据第一、第二主成分得分进行综合评价
+
+```{r}
+par(mfrow=c(1,2))
+plot(pca.fit$loadings[,1:2],main="观测变量的主成分系数",xlab="第一主成分系数",ylab="第二主成分系数")    #绘制各个观测变量的主成分系数（X=与PC1的系数，Y=与PC2的系数），理解主成分的含义
+text(pca.fit$loadings[,1:2],colnames(dat0[,2:15]),cex=0.8,pos=1,col="red")
+plot(dat0$score1,dat0$score2,main="样本点的主成分得分",xlab="第一主成分得分",ylab="第二主成分得分")    #绘制各个样本点的主成分得分散点图
+text(dat0$score1,dat0$score2,dat0$应聘者编号,cex=0.8,pos=3,col="blue")
+# 以上两步可以用biplot来替代
+par(mfrow=c(1,1))
+biplot(pca.fit)    #绘制biplot
+#结合主成分的含义，根据样本点在平面图所处位置来理解其综合评价情况
+```
