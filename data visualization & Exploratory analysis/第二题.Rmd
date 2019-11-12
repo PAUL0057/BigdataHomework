@@ -1,0 +1,300 @@
+---
+title: "数据可视化"
+author: "人民大学-钟保罗-2019101155"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    toc: TRUE
+    theme: cayman
+    highlight: github
+---
+
+# 一、数据可视化
+
+## 1 柱状图、饼图、点图、风玫瑰图
+
+绘制柱状图、饼图、点图、风玫瑰图，并将这几张图放在一个图形界面中显示；
+
+```{r echo = FALSE,warning=FALSE}
+library(ggplot2)
+library(bbplot)
+library(grid)
+mytheme1 = bbc_style()+theme(axis.title = element_text(size = 11),axis.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+mytheme2 = bbc_style()+theme(axis.title = element_blank(),axis.text = element_blank(),
+                             legend.position = "right",legend.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+vp = function(x, y) {
+  viewport(layout.pos.row = x, layout.pos.col = y)
+}
+data = read.csv("D:\\大数据相关\\2019大数据统计基础期末考试\\LoanStats3a.csv")
+blue = '#1380A1'
+```
+
+
+```{r echo=FALSE,warning=FALSE,fig.align='center',fig.width=8, fig.height=8}
+# 绘制柱状图、饼图、点图、风玫瑰图，并将这几张图放在一个图形界面中显示
+# 工作时间柱形图
+data_plot = na.omit(data$emp_length)
+data_plot = factor(data$emp_length,levels = c(levels(data_plot)[1:3],levels(data_plot)[5:12],levels(data_plot)[4],"n/a"))
+data_plot1 = data.frame(table(data_plot))[2:12,]
+p1 = ggplot(data_plot1,aes(x = data_plot,y=Freq))+geom_bar(stat = "identity",fill = blue)+mytheme1+
+  labs(title = 'Bar plot of emp_length',x = 'emp_length')+
+  geom_label(aes(x = data_plot, y = Freq, label = round(Freq, 0)),hjust = 0.5, vjust = 1, 
+             colour = "white", fill = NA, label.size = NA, family="Helvetica", size = 2)+theme(axis.text = element_text(size = 6))
+
+# home_ownership饼图
+data_plot = na.omit(data$home_ownership)
+data_plot1 = data.frame(table(data_plot)[2:6])
+label_value = paste('(', round(data_plot1$Freq/sum(data_plot1$Freq) * 100, 1), '%)', sep = '')
+label = paste(data_plot1$data_plot, label_value, sep = '')
+p2 = ggplot(data_plot1,aes(x ='Content',y=Freq,fill=data_plot))+geom_bar(stat = "identity",position = 'stack')+
+   labs(x = '', y = '', title = 'pie plot of home_ownership')  +coord_polar(theta = 'y')+mytheme2+
+   scale_fill_manual(values =c('#ABBCDA','#1380A1','#CFE0F7','#7C9AAB','#B4D1E1') )
+#点图
+data_plot = data[,c('total_pymnt','loan_amnt')]
+p3 = ggplot(data_plot,aes(x= total_pymnt,y=loan_amnt))+geom_point(color = blue,size = 0.5,alpha =0.5)+
+  mytheme1+labs(title = 'Point plot of pymnt and loan')
+#风玫瑰图 grade 为分类变量,loan_status/verification_status作为堆叠变量
+data_plot = data[,c('loan_status','verification_status','grade')]
+data_plot = na.omit(data_plot)
+data_plot = data_plot[data_plot$verification_status!='',]
+data_plot$verification_status = gsub(pattern = "VERIFIED - ", replacement = "", x = data_plot$verification_status) 
+p4 = ggplot(data_plot,aes(x=grade,y=..count..,fill=verification_status))+
+  geom_bar()+ coord_polar()+mytheme2+labs(title = 'Rose plot of grade and status')+
+  theme(legend.position = "right",legend.text = element_text(size = 11))+
+  scale_fill_manual(values =c('#ABBCDA','#1380A1','#CFE0F7','#7C9AAB','#B4D1E1') )
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(p1,vp = vp(1,1));print(p3,vp = vp(1,2))
+print(p2,vp = vp(2,1));print(p4,vp = vp(2,2))
+```
+
+## 2 直方图
+
+某一个连续型变量的分布直方图，并加入拟合分布线，直方图的组距和组数根据直方图经验公式设定（不要使用默认的），并且每个柱子里面填上相应的组的频数，整个图片加一个黑色的外框，并且图的底色为白色，柱子为红色，在密度最高的部分加上文字标注“此处密度最大”。
+
+本次选择funded_amnt变量来画分布直方图。
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+## 直方图
+funded_amnt = na.omit(data$funded_amnt)
+k = round(1+log(length(funded_amnt))/log(2))
+width_k = max(funded_amnt)/k
+breaks=seq(-width_k/2, max(funded_amnt)+width_k/2, by=width_k)
+amnt = cut(funded_amnt,breaks)
+data_plot = data.frame(table(amnt))
+data_plot$breaks = breaks[-length(breaks)]+width_k/2
+data_plot$density = data_plot$Freq/sum(data_plot$Freq)/width_k
+mydata = data.frame(funded_amnt)
+ggplot(mydata,aes(x = funded_amnt))+
+  geom_histogram(aes(y = ..density..),binwidth = width_k,color = 'black',fill = 'darkred')+ 
+  geom_text(aes(x = breaks,y = density/2,label = Freq),color = 'white',data = data_plot,size = 3)+
+  geom_line(stat="density", adjust=3, col="darkblue",size=1)+
+  theme(plot.background=element_rect(fill="white",colour="black ",size=2),panel.background=element_rect(fill=NA))+
+  annotate(geom="text",x=data_plot$breaks[which.max(data_plot$density)],y=max(data_plot$density),label="此处密度最大") 
+```
+
+## 3 二维密度图
+
+某两个连续型变量的密度图和分箱化的密度图
+
+本次选择installment和total_rec_prncp两个连续型变量，grade作为类别型变量进行分箱。
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+## 密度图
+plot_data = data[,c('installment',"total_rec_prncp",'grade')]
+plot_data$grade = as.character(plot_data$grade)
+plot_data = plot_data[plot_data$grade !='',]
+ggplot(plot_data, aes(installment, total_rec_prncp))+stat_density2d(aes(color = ..level..))
+```
+```{r echo=FALSE,warning=FALSE,fig.align='center',fig.width=6, fig.height=8}
+ggplot(plot_data, aes(installment, total_rec_prncp))+stat_density2d(aes(color = ..level..))+
+  facet_grid(grade ~ .)
+```
+
+## 4 聚类热图
+
+挑选多个连续型变量，进行聚类，并且绘制相应的热图，并进行美化（可以不用全部样本
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+
+## 聚类热图
+data_new = data[c(4500:4540),c('loan_amnt','out_prncp',
+                               'total_pymnt','total_rec_prncp',
+                               'total_rec_int')]
+data_new = na.omit(data_new)
+data_new = scale(data_new)
+distance = as.matrix(dist(data_new,method= 'euclidean'))
+heatmap(distance,symm=TRUE,main = '热图')
+```
+
+# 二、地图
+
+使用 province 数据中合适的变量，绘制两幅不同的图，进行空间数据的展示。
+
+## 1 GDP热力图
+
+使用GDP数据绘制各省份GDP热力图
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+Data=read.csv("D:\\大数据相关\\2019大数据统计基础期末考试\\province.csv",header=TRUE,stringsAsFactors=FALSE)[-c(2,1),]
+
+library(REmap)
+options(remap.ak="bMUmEwmBAPC1sGABp8Snzo67eRnci7t1")
+data=Data[,c(1,3)]
+province2 = Data[,c(1,3)]
+
+prov=mapNames("china")  #获取中国省份名称
+prov_geo=get_geo_position(prov)  #获取中国省份经纬度数据
+province2$指标 = gsub(' ','',province2$指标)
+colnames(province2) = c('city','value')
+province3=merge(x = province2, y = prov_geo, by = "city", all.x = TRUE)
+province3=province3[,c('lon','lat','value')]
+a=remapH(province3,maptype = 'china',
+       blurSize = 40,minAlpha =10,opacity = 1,color='red',
+       title = '各省份GDP热力图')
+
+remap.init()
+```
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+knitrREmap(a, local = F, height = '500px')
+```
+
+## 2 人口分布图
+
+使用人口数据绘制各省份人口图
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+data2<-Data[,c(1,2)]#选择年末人口数为变量
+data2[,2] = as.numeric(data2[,2])
+data2[,1] = gsub(' ','',data2[,1])
+a = remapC(data2,maptype="china",title="各省年末人口地图")#绘制地图
+remap.init()
+```
+
+```{r echo=FALSE,warning=FALSE,fig.align='center'}
+knitrREmap(a, local = F, height = '500px')
+```
+
+# 附录：R代码
+
+```{r eval= FALSE}
+library(ggplot2)
+library(bbplot)
+library(grid)
+mytheme1 = bbc_style()+theme(axis.title = element_text(size = 11),axis.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+mytheme2 = bbc_style()+theme(axis.title = element_blank(),axis.text = element_blank(),
+                             legend.position = "right",legend.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+vp = function(x, y) {
+  viewport(layout.pos.row = x, layout.pos.col = y)
+}
+data = read.csv("D:\\大数据相关\\2019大数据统计基础期末考试\\LoanStats3a.csv")
+blue = '#1380A1'
+
+# 绘制柱状图、饼图、点图、风玫瑰图，并将这几张图放在一个图形界面中显示
+# 工作时间柱形图
+data_plot = na.omit(data$emp_length)
+data_plot = factor(data$emp_length,levels = c(levels(data_plot)[1:3],levels(data_plot)[5:12],levels(data_plot)[4],"n/a"))
+data_plot1 = data.frame(table(data_plot))[2:12,]
+p1 = ggplot(data_plot1,aes(x = data_plot,y=Freq))+geom_bar(stat = "identity",fill = blue)+mytheme1+
+  labs(title = 'Bar plot of emp_length',x = 'emp_length')+
+  geom_label(aes(x = data_plot, y = Freq, label = round(Freq, 0)),hjust = 0.5, vjust = 1, 
+             colour = "white", fill = NA, label.size = NA, family="Helvetica", size = 2)+theme(axis.text = element_text(size = 6))
+
+# home_ownership饼图
+data_plot = na.omit(data$home_ownership)
+data_plot1 = data.frame(table(data_plot)[2:6])
+label_value = paste('(', round(data_plot1$Freq/sum(data_plot1$Freq) * 100, 1), '%)', sep = '')
+label = paste(data_plot1$data_plot, label_value, sep = '')
+p2 = ggplot(data_plot1,aes(x ='Content',y=Freq,fill=data_plot))+geom_bar(stat = "identity",position = 'stack')+
+   labs(x = '', y = '', title = 'pie plot of home_ownership')  +coord_polar(theta = 'y')+mytheme2+
+   scale_fill_manual(values =c('#ABBCDA','#1380A1','#CFE0F7','#7C9AAB','#B4D1E1') )
+#点图
+data_plot = data[,c('total_pymnt','loan_amnt')]
+p3 = ggplot(data_plot,aes(x= total_pymnt,y=loan_amnt))+geom_point(color = blue,size = 0.5,alpha =0.5)+
+  mytheme1+labs(title = 'Point plot of pymnt and loan')
+#风玫瑰图 grade 为分类变量,loan_status/verification_status作为堆叠变量
+data_plot = data[,c('loan_status','verification_status','grade')]
+data_plot = na.omit(data_plot)
+data_plot = data_plot[data_plot$verification_status!='',]
+data_plot$verification_status = gsub(pattern = "VERIFIED - ", replacement = "", x = data_plot$verification_status) 
+p4 = ggplot(data_plot,aes(x=grade,y=..count..,fill=verification_status))+
+  geom_bar()+ coord_polar()+mytheme2+labs(title = 'Rose plot of grade and status')+
+  theme(legend.position = "right",legend.text = element_text(size = 11))+
+  scale_fill_manual(values =c('#ABBCDA','#1380A1','#CFE0F7','#7C9AAB','#B4D1E1') )
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(p1,vp = vp(1,1));print(p3,vp = vp(1,2))
+print(p2,vp = vp(2,1));print(p4,vp = vp(2,2))
+
+## 直方图
+funded_amnt = na.omit(data$funded_amnt)
+k = round(1+log(length(funded_amnt))/log(2))
+width_k = max(funded_amnt)/k
+breaks=seq(-width_k/2, max(funded_amnt)+width_k/2, by=width_k)
+amnt = cut(funded_amnt,breaks)
+data_plot = data.frame(table(amnt))
+data_plot$breaks = breaks[-length(breaks)]+width_k/2
+data_plot$density = data_plot$Freq/sum(data_plot$Freq)/width_k
+mydata = data.frame(funded_amnt)
+ggplot(mydata,aes(x = funded_amnt))+
+  geom_histogram(aes(y = ..density..),binwidth = width_k,color = 'black',fill = 'darkred')+ 
+  geom_text(aes(x = breaks,y = density/2,label = Freq),color = 'white',data = data_plot,size = 3)+
+  geom_line(stat="density", adjust=3, col="darkblue",size=1)+
+  theme(plot.background=element_rect(fill="white",colour="black ",size=2),panel.background=element_rect(fill=NA))+
+  annotate(geom="text",x=data_plot$breaks[which.max(data_plot$density)],y=max(data_plot$density),label="此处密度最大") 
+
+## 密度图
+plot_data = data[,c('installment',"total_rec_prncp",'grade')]
+plot_data$grade = as.character(plot_data$grade)
+plot_data = plot_data[plot_data$grade !='',]
+ggplot(plot_data, aes(installment, total_rec_prncp))+stat_density2d(aes(color = ..level..))
+
+ggplot(plot_data, aes(installment, total_rec_prncp))+stat_density2d(aes(color = ..level..))+
+  facet_grid(grade ~ .)
+
+
+## 聚类热图
+data_new = data[c(4500:4540),c('loan_amnt','out_prncp',
+                               'total_pymnt','total_rec_prncp',
+                               'total_rec_int')]
+data_new = na.omit(data_new)
+data_new = scale(data_new)
+distance = as.matrix(dist(data_new,method= 'euclidean'))
+heatmap(distance,symm=TRUE,main = '热图')
+
+Data=read.csv("D:\\大数据相关\\2019大数据统计基础期末考试\\province.csv",header=TRUE,stringsAsFactors=FALSE)[-c(2,1),]
+
+library(REmap)
+options(remap.ak="bMUmEwmBAPC1sGABp8Snzo67eRnci7t1")
+data=Data[,c(1,3)]
+province2 = Data[,c(1,3)]
+
+prov=mapNames("china")  #获取中国省份名称
+prov_geo=get_geo_position(prov)  #获取中国省份经纬度数据
+province2$指标 = gsub(' ','',province2$指标)
+colnames(province2) = c('city','value')
+province3=merge(x = province2, y = prov_geo, by = "city", all.x = TRUE)
+province3=province3[,c('lon','lat','value')]
+a=remapH(province3,maptype = 'china',
+       blurSize = 40,minAlpha =10,opacity = 1,color='red',
+       title = '各省份GDP热力图')
+
+remap.init()
+
+knitrREmap(a, local = F, height = '500px')
+
+data2<-Data[,c(1,2)]#选择年末人口数为变量
+data2[,2] = as.numeric(data2[,2])
+data2[,1] = gsub(' ','',data2[,1])
+a = remapC(data2,maptype="china",title="各省年末人口地图")#绘制地图
+remap.init()
+
+knitrREmap(a, local = F, height = '500px')
+
+```

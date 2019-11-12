@@ -1,0 +1,436 @@
+---
+title: "数据预处理"
+author: "人民大学-钟保罗-2019101155"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    toc: TRUE
+    theme: cayman
+    highlight: github
+---
+
+# 鲍鱼数据数据预处理
+
+UCI鲍鱼数据含有4177只鲍鱼的观测。其中，被解释变量是Rings（环的个数），鲍鱼年龄是环的个数加1.5。其他变量为预测变量。
+
+## 1)数据预览
+
+对数据作图估计预测变量和被解释变量之间的函数关系。
+
+由下图可以看出随着解释变量数值的增加，被解释变量也有增加的趋势。
+
+```{r  echo = FALSE,fig.align='center',warning=FALSE,fig.height=28,fig.width=8}
+library(AppliedPredictiveModeling)
+library(ggplot2)
+library(bbplot)
+library(grid)
+library(GGally)
+library(corrplot)
+library(MASS)
+set.seed(1)
+```
+
+```{r  echo = FALSE,fig.align='center',warning=FALSE,fig.height=28,fig.width=8}
+data(abalone)
+
+vp = function(x, y) {viewport(layout.pos.row = x, layout.pos.col = y)}
+mytheme1 = bbc_style()+theme(axis.title = element_text(size = 11),axis.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+blue = "#1380A1"
+
+
+p1=ggplot(abalone,aes(x=LongestShell,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'LongestShell & Rings')
+p1.1=ggplot(abalone,aes(x=LongestShell))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of LongestShell')
+p2=ggplot(abalone,aes(x=Diameter,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'Diameter & Rings')
+p2.1=ggplot(abalone,aes(x=Diameter))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of Diameter')
+p3=ggplot(abalone,aes(x=Height,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'Height & Rings')
+p3.1=ggplot(abalone,aes(x=Height))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of Height')
+p4=ggplot(abalone,aes(x=WholeWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'WholeWeight & Rings')
+p4.1=ggplot(abalone,aes(x=WholeWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of WholeWeight')
+p5=ggplot(abalone,aes(x=ShuckedWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'ShuckedWeight & Rings')
+p5.1=ggplot(abalone,aes(x=ShuckedWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of ShuckedWeight')
+p6=ggplot(abalone,aes(x=VisceraWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'VisceraWeight & Rings')
+p6.1=ggplot(abalone,aes(x=VisceraWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of VisceraWeight')
+p7=ggplot(abalone,aes(x=ShellWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'ShellWeight & Rings')
+p7.1=ggplot(abalone,aes(x=ShellWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of ShellWeight')
+p8=ggplot(abalone,aes(x=factor(Type),y=Rings))+geom_boxplot(fill = blue)+mytheme1+xlab("abalone type")+ylab("number")+labs(title = 'Type & Rings')
+p8.1=ggplot(abalone,aes(x=Type))+geom_bar(fill = blue)+mytheme1+labs(title = 'Distribution of Type')
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(8, 2)))
+print(p1.1,vp = vp(1,1));print(p1,vp = vp(1,2))
+print(p2.1,vp = vp(2,1));print(p2,vp = vp(2,2))
+print(p3.1,vp = vp(3,1));print(p3,vp = vp(3,2))
+print(p4.1,vp = vp(4,1));print(p4,vp = vp(4,2))
+print(p5.1,vp = vp(5,1));print(p5,vp = vp(5,2))
+print(p6.1,vp = vp(6,1));print(p6,vp = vp(6,2))
+print(p7.1,vp = vp(7,1));print(p7,vp = vp(7,2))
+print(p8.1,vp = vp(8,1));print(p8,vp = vp(8,2))
+```
+
+## 2)相关性探究
+
+用散点图和相关系数图解释预测变量之间的相关性。 
+
+```{r echo = FALSE,fig.align='center',warning=FALSE,fig.height=8,fig.width=8}
+excp_Rings = colnames(abalone)[1:8]
+#散点图
+ggpairs(abalone[,excp_Rings])
+```
+
+从散点图来看，各变量间存在强相关性。
+
+```{r echo = FALSE,fig.align='center',warning=FALSE,fig.height=5,fig.width=5}
+#相关系数图
+excp_Rings_Type = colnames(abalone)[2:8]
+cordata=cor(abalone[,excp_Rings_Type])
+corrplot(cordata,type = "upper")
+```
+
+从相关系数图来看，各变量间的相关系数很大。 
+ 
+## 3)变量选择
+
+对预测变量估计**重要性得分**。找到一种筛选方法得到**预测变量子集**，该集合不含冗余变量。 
+
+因为各个变量之间和被解释变量间为线性关系，所以用pearson相关系数来衡量解释变量重要性。因为type变量为因子型变量，因此进行one-hot编码。
+
+其相关系数如下所示：
+
+```{r echo = FALSE}
+#将type变量进行one-hot编码
+mydata = abalone
+mydata$type_F = ifelse(mydata$Type=='F',1,0)
+mydata$type_I = ifelse(mydata$Type=='I',1,0)
+mydata$type_M = ifelse(mydata$Type=='M',1,0)
+mydata = mydata[,c(2:12)]
+#计算相关系数
+cor(mydata$Rings,mydata[,c(1:7,9:11)])
+```
+
+使用逐步回归的方法筛选变量，发现逐步回归法剔除了 Type_F，Type_M，LongestShell
+
+逐步回归的模型结果如下：
+
+```{r echo = FALSE,results = 'hide'}
+lm_model0 = lm(Rings~.,data=mydata)
+lm_both = step(lm_model0,direction = "both")
+summary(lm_both)
+```
+```{r echo = FALSE}
+summary(lm_both)
+```
+
+
+## 4)主成分提取
+
+这里对连续型变量进行主成分分析，发现碎石图中转折点出现在第二个主成分上，且第一个主成分已经可以解释90%的方差，因此只选择一个主成分就够了
+
+```{r echo = FALSE}
+data_ana = abalone[,c(2:8)]
+prin_model = princomp(data_ana)
+summary(prin_model)
+screeplot(prin_model,type="lines",main="碎石图",col=blue)
+```
+
+# 数据模拟
+
+## 1)模拟数据生成
+写一个 R 函数从该模型中模拟数据。 
+构建生成数据函数
+```{r }
+gen_data = function(min,max,mean,std,num){
+  x1 = runif(num,min,max)
+  x2 = runif(num,min,max)
+  x3 = runif(num,min,max)
+  x4 = runif(num,min,max)
+  x5 = runif(num,min,max)
+  y = 10*sin(pi*x1*x2)+20*(x3-0.5)^2+10*x4+5*x5+rnorm(num,mean,std)
+  result = data.frame(x1,x2,x3,x4,x5,y)
+  return(result)
+}
+```
+
+## 2)研究变量间关系
+
+Q: 随机模拟一个数据集，样本量是500，绘制图形研究预测变量和被解释变量之间的关系。 
+
+由图可知 x3与y 存在强关系
+
+```{r warning=FALSE,echo = FALSE,fig.height=9,fig.width=6}
+
+#(2)生成数据
+data_gen = gen_data(1,10,0,1,500)
+p1=ggplot(data_gen,aes(x=x1,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x1 & y')
+p2=ggplot(data_gen,aes(x=x2,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x2 & y')
+p3=ggplot(data_gen,aes(x=x3,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x3 & y')
+p4=ggplot(data_gen,aes(x=x4,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x4 & y')
+p5=ggplot(data_gen,aes(x=x5,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x5 & y')
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(3, 2)))
+print(p1,vp = vp(1,1));print(p2,vp = vp(1,2))
+print(p3,vp = vp(2,1));print(p4,vp = vp(2,2))
+print(p5,vp = vp(3,1))
+```
+
+## 3)变量选择
+
+```{r echo=FALSE,results = 'hide'}
+model0 = lm(y~.,data = data_gen)
+model_for = step(model0,direction = 'forward')
+model_back = step(model0,direction = 'backward')
+model_both = step(model0,direction = 'both')
+```
+向前法模型保留了所有变量
+```{r}
+model_for
+```
+后退法模型保留了x3、x4、x5
+```{r}
+model_back
+```
+逐步回归法模型保留了x3、x4、x5
+```{r}
+model_both
+```
+
+## 4)过滤法
+
+应用不同的过滤法，逐个评估变量。
+
+### 1.方差
+
+删除方差几乎为0的变量
+
+如果一个变量方差为0，则其不会提供有用的信息，所以将方差为0的变量删去。
+
+本文各个变量服从相同的分布，方差均不为零。变量方差如下：
+```{r echo=FALSE}
+# 删除方差几乎为0的变量,本文各个变量服从相同的分布，所以方差都近似相同
+var_var=c()
+for (i in 1:5) {var_var[i]=var(data_gen[,i])}
+print(var_var)
+```
+
+### 2.强相关
+
+去除强相关变量
+
+变量间彼此相关会面临多重共线性，因此应该删掉这些变量，从下面的相关系数矩阵图可以看出，各变量间的相关性较小。
+
+```{r echo=FALSE}
+# 去除强相关变量
+cormatrix=cor(data_gen[,-6])
+corrplot(cormatrix)
+```
+
+### 3.变量聚类
+
+对变量聚类，分成不同组后，将不同组内的变量挑选几个，因为每个聚类分成额组内变量都十分相似，因此每个组只需要用一个变量代表即可，本次数据可以挑选x3、x5、x4
+
+```{r echo=FALSE,warning= FALSE,results = 'hide'}
+#变量聚类 
+library(Hmisc)
+tmp=varclus(as.matrix(data_gen[,setdiff(names(data_gen),c('y'))]))
+```
+```{r echo=FALSE,warning= FALSE}
+plot(tmp)
+```
+
+### 4.ReliefF算法
+
+使用不同的统计量ReliefFequalK 和ReliefFexpRank，但是结果并不显著，各个变量间的重要性没有拉开差距。
+
+```{r echo=FALSE,warning= FALSE,results = 'hide'}
+#relieff选择
+library(caret)
+library(CORElearn)
+reliefValues=attrEval(y ~ .,data = data_gen,estimator = "ReliefFequalK",ReliefIterations = 50)
+reliefValues1=attrEval(y ~ .,data = data_gen,estimator = "ReliefFexpRank",ReliefIterations = 50)
+```
+也可以看出x1,x2有相同的倾向性，由于重要性相近，很难进行选择。
+第一行为ReliefFequalK的值
+第二行为ReliefFexpRank的值
+```{r echo=FALSE}
+#也可以看出x1,x2有相同的倾向性，由于重要性相近，很难进行选择。
+reliefValues
+reliefValues1
+
+```
+
+### 5.loess评分
+
+设置不同的阈值可以得出不同的变量。
+
+阈值选为0.05时只保留x3
+
+loess表:
+```{r echo=FALSE}
+
+#非过滤法，loess选择,但可以看出x1,x2基本由相同的倾向性
+loessresult=filterVarImp(x=data_gen[,-6],y=data_gen[,6],nonpara=TRUE)
+loessresult
+loessresult=loessresult$Overall[loessresult$Overall>=0.05]
+```
+
+### 6.mic选择
+
+此处若设置阈值为0.2，则只有一个变量符合。
+
+mic值：
+```{r echo=FALSE}
+#mic选择
+library(minerva)
+micValues1 = mine(data_gen[, -6],data_gen[,6])
+data3=as.data.frame(micValues1$MIC)
+micValues1$MIC
+```
+
+
+# 附录：R代码
+
+```{r eval=FALSE}
+library(AppliedPredictiveModeling)
+library(ggplot2)
+library(bbplot)
+library(grid)
+library(GGally)
+library(corrplot)
+library(MASS)
+data(abalone)
+
+vp = function(x, y) {
+  viewport(layout.pos.row = x, layout.pos.col = y)
+}
+mytheme1 = bbc_style()+theme(axis.title = element_text(size = 11),axis.text = element_text(size = 11),
+                             plot.title = element_text(size = 14),plot.subtitle = element_text(size = 12))
+blue = "#1380A1"
+
+# 1，鲍鱼数据
+# (1)
+p1=ggplot(abalone,aes(x=LongestShell,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'LongestShell & Rings')
+p1.1=ggplot(abalone,aes(x=LongestShell))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of LongestShell')
+p2=ggplot(abalone,aes(x=Diameter,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'Diameter & Rings')
+p2.1=ggplot(abalone,aes(x=Diameter))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of Diameter')
+p3=ggplot(abalone,aes(x=Height,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'Height & Rings')
+p3.1=ggplot(abalone,aes(x=Height))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of Height')
+p4=ggplot(abalone,aes(x=WholeWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'WholeWeight & Rings')
+p4.1=ggplot(abalone,aes(x=WholeWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of WholeWeight')
+p5=ggplot(abalone,aes(x=ShuckedWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'ShuckedWeight & Rings')
+p5.1=ggplot(abalone,aes(x=ShuckedWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of ShuckedWeight')
+p6=ggplot(abalone,aes(x=VisceraWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'VisceraWeight & Rings')
+p6.1=ggplot(abalone,aes(x=VisceraWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of VisceraWeight')
+p7=ggplot(abalone,aes(x=ShellWeight,y=Rings))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'ShellWeight & Rings')
+p7.1=ggplot(abalone,aes(x=ShellWeight))+geom_histogram(fill = blue,bins = 30)+mytheme1+labs(title = 'Distribution of ShellWeight')
+p8=ggplot(abalone,aes(x=factor(Type),y=Rings))+geom_boxplot(fill = blue)+mytheme1+xlab("abalone type")+ylab("number")+labs(title = 'Type & Rings')
+p8.1=ggplot(abalone,aes(x=Type))+geom_bar(fill = blue)+mytheme1+labs(title = 'Distribution of Type')
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(8, 2)))
+print(p1.1,vp = vp(1,1));print(p1,vp = vp(1,2))
+print(p2.1,vp = vp(2,1));print(p2,vp = vp(2,2))
+print(p3.1,vp = vp(3,1));print(p3,vp = vp(3,2))
+print(p4.1,vp = vp(4,1));print(p4,vp = vp(4,2))
+print(p5.1,vp = vp(5,1));print(p5,vp = vp(5,2))
+print(p6.1,vp = vp(6,1));print(p6,vp = vp(6,2))
+print(p7.1,vp = vp(7,1));print(p7,vp = vp(7,2))
+print(p8.1,vp = vp(8,1));print(p8,vp = vp(8,2))
+
+
+
+# (2)变量相关性
+excp_Rings = colnames(abalone)[1:8]
+#散点图
+ggpairs(abalone[,excp_Rings])
+#相关系数图
+excp_Rings_Type = colnames(abalone)[2:8]
+cordata=cor(abalone[,excp_Rings_Type])
+corrplot(cordata,type = "upper")
+
+# (3)变量选择
+mydata = abalone
+mydata$type_F = ifelse(mydata$Type=='F',1,0)
+mydata$type_I = ifelse(mydata$Type=='I',1,0)
+mydata$type_M = ifelse(mydata$Type=='M',1,0)
+mydata = mydata[,c(2:12)]
+cor(mydata$Rings,mydata[,c(1:7,9:11)])
+lm_model0 = lm(Rings~.,data=mydata)
+summary(lm_model0)
+lm_both = step(lm_model0,direction = "both")
+summary(lm_both)
+
+# (4)主成分分析
+data_ana = abalone[,c(2:8)]
+prin_model = princomp(data_ana)
+summary(prin_model)
+screeplot(prin_model,type="lines",main="碎石图",col=blue)
+
+# 二
+#(1)模拟数据
+gen_data = function(min,max,mean,std,num){
+  x1 = runif(num,min,max)
+  x2 = runif(num,min,max)
+  x3 = runif(num,min,max)
+  x4 = runif(num,min,max)
+  x5 = runif(num,min,max)
+  y = 10*sin(pi*x1*x2)+20*(x3-0.5)^2+10*x4+5*x5+rnorm(num,mean,std)
+  result = data.frame(x1,x2,x3,x4,x5,y)
+  return(result)
+}
+#(2)生成数据
+data_gen = gen_data(1,10,0,1,500)
+p1=ggplot(data_gen,aes(x=x1,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x1 & y')
+p2=ggplot(data_gen,aes(x=x2,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x2 & y')
+p3=ggplot(data_gen,aes(x=x3,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x3 & y')
+p4=ggplot(data_gen,aes(x=x4,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x4 & y')
+p5=ggplot(data_gen,aes(x=x5,y=y))+geom_point(size=1,color = blue)+mytheme1+labs(title = 'x5 & y')
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(3, 2)))
+print(p1,vp = vp(1,1));print(p2,vp = vp(1,2))
+print(p3,vp = vp(2,1));print(p4,vp = vp(2,2))
+print(p5,vp = vp(3,1))
+#(3)
+model0 = lm(y~.,data = data_gen)
+summary(model0)
+model_for = step(model0,direction = 'forward')
+model_back = step(model0,direction = 'backward')
+model_both = step(model0,direction = 'both')
+
+# (4)过滤法
+
+
+# (4) 过滤法
+# 删除方差几乎为0的变量,本文各个变量服从相同的分布，所以方差都近似相同
+var_var=c()
+for (i in 1:5) {
+  var_var[i]=var(data_gen[,i])
+}
+
+# 去除强相关变量
+cormatrix=cor(data_gen[,-6])
+corrplot(cormatrix)
+
+#变量聚类 
+library(Hmisc)
+tmp=varclus(as.matrix(data_gen[,setdiff(names(data_gen),c('y'))]))
+plot(tmp)
+
+#relieff选择
+library(caret)
+library(CORElearn)
+reliefValues=attrEval(y ~ .,data = data_gen,estimator = "ReliefFequalK",ReliefIterations = 50)
+reliefValues1=attrEval(y ~ .,data = data_gen,estimator = "ReliefFexpRank",ReliefIterations = 50)
+#也可以看出x1,x2有相同的倾向性，由于重要性相近，很难进行选择。
+reliefValues
+reliefValues1
+
+#非过滤法，loess选择,但可以看出x1,x2基本由相同的倾向性
+loessresult=filterVarImp(x=data_gen[,-6],y=data_gen[,6],nonpara=TRUE)
+loessresult
+loessresult=loessresult$Overall[loessresult$Overall>=0.05]
+loessresult
+
+#mic选择
+library(minerva)
+micValues1 = mine(data_gen[, -6],data_gen[,6])
+data3=as.data.frame(micValues1$MIC)
+micValues1$MIC
+```
